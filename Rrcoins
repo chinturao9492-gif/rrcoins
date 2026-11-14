@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0 0 85px; background: #101522; color: #fff; font-family: Arial, sans-serif; }
+    .header { padding: 20px; background: #192337; text-align: center; }
+    .header h2 { margin: 0; color: #65d6ff; }
+    .container { padding: 16px; max-width: 600px; margin: auto; }
+    .balance-card { background: linear-gradient(135deg, #1767b1, #633cc9); border-radius: 18px; padding: 24px; text-align: center; margin-bottom: 18px; }
+    .balance-card p { margin: 0; color: #d8eaff; }
+    .balance { font-size: 36px; font-weight: bold; margin: 12px 0; }
+    .card { background: #1b2639; padding: 18px; border-radius: 15px; margin-bottom: 14px; }
+    .card h3 { margin-top: 0; color: #65d6ff; }
+    button { border: none; border-radius: 10px; padding: 13px 16px; background: #168de2; color: #fff; font-size: 15px; font-weight: bold; cursor: pointer; }
+    button:disabled { background: #536174; cursor: not-allowed; }
+    .primary, .task-button { width: 100%; margin-top: 8px; }
+    .secondary { background: #2b3b57; }
+    input { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #45536a; border-radius: 10px; background: #101522; color: #fff; font-size: 15px; }
+    .nav { position: fixed; bottom: 0; left: 0; right: 0; background: #192337; display: flex; justify-content: space-around; padding: 10px 2px; border-top: 1px solid #344158; z-index: 10; }
+    .nav button { background: transparent; color: #aebbd0; padding: 8px 3px; font-size: 11px; flex: 1; }
+    .nav button.active { color: #65d6ff; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .message { position: sticky; top: 8px; z-index: 20; padding: 12px; border-radius: 10px; margin-bottom: 12px; background: #26344b; display: none; line-height: 1.5; }
+    .message.error { background: #5a2430; }
+    .message.ok { background: #1d5a3a; }
+    .muted { color: #aebbd0; font-size: 13px; }
+    .task-title { font-size: 17px; font-weight: bold; }
+    .empty { text-align: center; padding: 25px 10px; color: #aebbd0; }
+    .wallet-text { word-break: break-all; }
+  </style>
+</head>
+<body>
+
+  <div class="header"><h2>RR Coins Earn Bot</h2></div>
+
+  <div class="container">
+    <div id="message" class="message"></div>
+
+    <div id="appContent" style="display:none;">
+
+      <section id="homePage" class="page active">
+        <div class="balance-card">
+          <p>YOUR COIN BALANCE</p>
+          <div class="balance" id="homeBalance">0</div>
+          <p>RR Coins</p>
+        </div>
+        <div class="card">
+          <h3>Welcome</h3>
+          <p id="welcomeName">Welcome to RR Coins Earn Bot</p>
+          <p class="muted">Complete tasks and earn coins.</p>
+        </div>
+      </section>
+
+      <section id="tasksPage" class="page">
+        <div class="card">
+          <h3>📋 Available Tasks</h3>
+          <p class="muted">Join, then press Verify to get your reward.</p>
+          <p id="taskCount">Loading tasks...</p>
+        </div>
+        <div id="tasksList"></div>
+      </section>
+
+      <section id="miningPage" class="page">
+        <div class="card">
+          <h3>⛏️ Coin Mining</h3>
+          <p>Mining Rate: <b>1 Coin / Hour</b></p>
+          <p>Daily Limit: <b>24 Coins</b></p>
+          <p>Earned Today: <b id="miningEarned">0</b> Coins</p>
+          <p class="muted" id="miningStatus"></p>
+          <button class="primary" id="startBtn" onclick="startMining()">Start Mining</button>
+          <button class="primary" onclick="claimMining()">Claim Mining Coins</button>
+        </div>
+      </section>
+
+      <section id="walletPage" class="page">
+        <div class="card">
+          <h3>💰 TON Wallet</h3>
+          <p class="muted">Enter your TON wallet address.</p>
+          <input type="text" id="walletInput" placeholder="Enter TON Wallet Address" autocomplete="off">
+          <button class="primary" onclick="saveWallet()">Save Wallet</button>
+          <p class="muted wallet-text" id="savedWallet"></p>
+        </div>
+      </section>
+
+      <section id="withdrawPage" class="page">
+        <div class="card">
+          <h3>💸 Withdraw Coins</h3>
+          <p>Available Balance:</p>
+          <h2 id="withdrawBalance">0 Coins</h2>
+          <input type="number" id="withdrawAmount" placeholder="Enter withdrawal amount" min="1" step="1">
+          <button class="primary" onclick="withdrawCoins()">Submit Withdrawal</button>
+          <p class="muted">Minimum 10 coins. Requests are subject to admin review.</p>
+        </div>
+      </section>
+
+    </div>
+
+    <div id="loading" class="card">Loading your account...</div>
+
+    <div id="authError" class="card" style="display:none;">
+      <h3>Telegram App Required</h3>
+      <p id="authErrorText">Please open this app using the Open App button in Telegram.</p>
+    </div>
+  </div>
+
+  <nav class="nav" id="nav" style="display:none;">
+    <button class="active" onclick="showPage('home')">🏠<br>Home</button>
+    <button onclick="showPage('tasks')">📋<br>Tasks</button>
+    <button onclick="showPage('mining')">⛏️<br>Mining</button>
+    <button onclick="showPage('wallet')">💰<br>Wallet</button>
+    <button onclick="showPage('withdraw')">💸<br>Withdraw</button>
+  </nav>
+
+  <script>
+    // If you host this file outside Google (GitHub Pages etc.), paste your
+    // Apps Script Web App URL (ends with /exec) here. Leave empty when the
+    // file is served by Apps Script itself.
+    const API_URL = '';
+
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg) { tg.ready(); tg.expand(); }
+    const initData = (tg && tg.initData) || '';
+
+    let msgTimer = null;
+    let busy = false;
+
+    function showMessage(text, type) {
+      const box = document.getElementById('message');
+      box.textContent = text;
+      box.className = 'message ' + (type || '');
+      box.style.display = 'block';
+      clearTimeout(msgTimer);
+      msgTimer = setTimeout(function () { box.style.display = 'none'; }, 4500);
+    }
+
+    function callApi(action, data, callback) {
+      if (busy) return;
+      busy = true;
+      data = data || {};
+      data.initData = initData;
+
+      const done = function (fn) { return function (arg) { busy = false; fn(arg); }; };
+      const onOk = done(function (result) { if (callback) callback(result); });
+      const onErr = done(function (err) {
+        showMessage((err && err.message) || 'Something went wrong.', 'error');
+      });
+
+      if (window.google && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).api(action, data);
+      } else if (API_URL) {
+        fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: action, data: data })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (!j.ok) throw new Error(j.error || 'Request failed.');
+            onOk(j.data);
+          })
+          .catch(onErr);
+      } else {
+        onErr(new Error('API_URL is not set.'));
+      }
+    }
+
+    function showPage(page) {
+      document.querySelectorAll('.page').forEach(function (el) { el.classList.remove('active'); });
+      document.getElementById(page + 'Page').classList.add('active');
+      const order = ['home', 'tasks', 'mining', 'wallet', 'withdraw'];
+      document.querySelectorAll('.nav button').forEach(function (b, i) {
+        b.classList.toggle('active', order[i] === page);
+      });
+    }
+
+    function fmt(n) { return Number(n || 0).toLocaleString(); }
+
+    function updateDashboard(data) {
+      document.getElementById('homeBalance').textContent = fmt(data.balance);
+      document.getElementById('withdrawBalance').textContent = fmt(data.balance) + ' Coins';
+      document.getElementById('welcomeName').textContent = 'Welcome, ' + (data.name || 'User');
+      document.getElementById('miningEarned').textContent = Number(data.miningEarned || 0);
+      document.getElementById('miningStatus').textContent =
+        data.mining ? '⛏️ Mining is running.' : 'Press Start Mining to begin.';
+      document.getElementById('startBtn').disabled = !!data.mining;
+
+      const input = document.getElementById('walletInput');
+      if (document.activeElement !== input) input.value = data.wallet || '';
+      document.getElementById('savedWallet').textContent =
+        data.wallet ? 'Saved wallet: ' + data.wallet : 'No wallet saved yet.';
+
+      renderTasks(data.tasks || []);
+      document.getElementById('loading').style.display = 'none';
+    }
+
+    function renderTasks(tasks) {
+      const list = document.getElementById('tasksList');
+      list.innerHTML = '';
+      document.getElementById('taskCount').textContent = tasks.length + ' Tasks Available';
+
+      if (!tasks.length) {
+        list.innerHTML = '<div class="card empty">0 Tasks Available</div>';
+        return;
+      }
+
+      tasks.forEach(function (task) {
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        const title = document.createElement('div');
+        title.className = 'task-title';
+        title.textContent = task.title;
+
+        const reward = document.createElement('p');
+        reward.textContent = 'Reward: ' + task.reward + ' Coins';
+
+        card.appendChild(title);
+        card.appendChild(reward);
+
+        if (task.claimed) {
+          const done = document.createElement('button');
+          done.className = 'task-button';
+          done.textContent = '✓ Completed';
+          done.disabled = true;
+          card.appendChild(done);
+        } else {
+          const join = document.createElement('button');
+          join.className = 'task-button';
+          join.textContent = 'Join';
+          join.onclick = function () { openTask(task); };
+          card.appendChild(join);
+
+          const verify = document.createElement('button');
+          verify.className = 'task-button secondary';
+          verify.textContent = 'Verify & Claim';
+          verify.onclick = function () { verifyTask(task); };
+          card.appendChild(verify);
+        }
+        list.appendChild(card);
+      });
+    }
+
+    function openTask(task) {
+      if (task.url) {
+        if (tg && tg.openTelegramLink) tg.openTelegramLink(task.url);
+        else window.open(task.url, '_blank');
+      }
+      showMessage('Join, come back and press Verify & Claim.');
+    }
+
+    function verifyTask(task) {
+      callApi('claimTask', { taskId: task.id }, function (result) {
+        updateDashboard(result);
+        showMessage('Task completed! Coins added.', 'ok');
+      });
+    }
+
+    function startMining() {
+      callApi('startMining', {}, function (result) {
+        updateDashboard(result.dashboard);
+        showMessage(result.message, 'ok');
+      });
+    }
+
+    function claimMining() {
+      callApi('claimMining', {}, function (result) {
+        updateDashboard(result.dashboard);
+        showMessage(result.reward + ' mining coins added!', 'ok');
+      });
+    }
+
+    function saveWallet() {
+      const wallet = document.getElementById('walletInput').value.trim();
+      if (!wallet) { showMessage('Please enter your TON wallet address.', 'error'); return; }
+      callApi('saveWallet', { wallet: wallet }, function (result) {
+        updateDashboard(result);
+        showMessage('Wallet saved successfully.', 'ok');
+      });
+    }
+
+    function withdrawCoins() {
+      const amount = document.getElementById('withdrawAmount').value;
+      if (!amount || Number(amount) <= 0) { showMessage('Enter a valid withdrawal amount.', 'error'); return; }
+
+      const submit = function () {
+        callApi('withdraw', { amount: amount }, function (result) {
+          updateDashboard(result.dashboard);
+          document.getElementById('withdrawAmount').value = '';
+          showMessage(result.message, 'ok');
+        });
+      };
+
+      if (tg && tg.showConfirm) {
+        tg.showConfirm('Submit withdrawal request for ' + amount + ' coins?', function (ok) { if (ok) submit(); });
+      } else if (confirm('Submit withdrawal request for ' + amount + ' coins?')) {
+        submit();
+      }
+    }
+
+    function loadDashboard() {
+      if (!initData) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('authError').style.display = 'block';
+        return;
+      }
+      callApi('dashboard', {}, function (result) {
+        document.getElementById('appContent').style.display = 'block';
+        document.getElementById('nav').style.display = 'flex';
+        updateDashboard(result);
+      });
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
